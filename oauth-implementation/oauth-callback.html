@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Google OAuth Callback</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin-top: 50px;
+      background-color: #f5f5f5;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    .logo {
+      margin-bottom: 20px;
+    }
+    .success {
+      color: #4CAF50;
+      font-weight: bold;
+    }
+    .error {
+      color: #F44336;
+      font-weight: bold;
+    }
+    .code {
+      background-color: #f1f1f1;
+      padding: 10px;
+      border-radius: 4px;
+      font-family: monospace;
+      word-break: break-all;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="logo">
+      <h2>ReviewFlow</h2>
+    </div>
+    <h1>Google OAuth Callback</h1>
+    <div id="status">Processing your authorization...</div>
+    <div id="code-container" style="display: none; margin-top: 20px;">
+      <p>Authorization code:</p>
+      <div id="code" class="code"></div>
+    </div>
+  </div>
+
+  <script>
+    // Function to get URL parameters
+    function getUrlParams() {
+      const params = {};
+      const queryString = window.location.search.substring(1);
+      const pairs = queryString.split('&');
+      
+      for (const pair of pairs) {
+        const [key, value] = pair.split('=');
+        if (key) {
+          params[decodeURIComponent(key)] = decodeURIComponent(value || '');
+        }
+      }
+      
+      return params;
+    }
+
+    // Process the OAuth callback
+    function processCallback() {
+      const params = getUrlParams();
+      const statusElement = document.getElementById('status');
+      const codeContainer = document.getElementById('code-container');
+      const codeElement = document.getElementById('code');
+      
+      if (params.code) {
+        // Success - we got an authorization code
+        statusElement.textContent = 'Authorization successful! You can close this window.';
+        statusElement.className = 'success';
+        
+        // Display the code (for debugging purposes)
+        codeElement.textContent = params.code;
+        
+        // Send the code back to the opener window
+        if (window.opener && !window.opener.closed) {
+          window.opener.postMessage({
+            type: 'oauth_callback',
+            code: params.code
+          }, window.location.origin);
+          
+          // Close this window after a short delay
+          setTimeout(() => window.close(), 2000);
+        } else {
+          statusElement.textContent = 'Authorization successful, but the opener window is no longer available.';
+          codeContainer.style.display = 'block';
+        }
+      } else if (params.error) {
+        // Error occurred
+        statusElement.textContent = 'Authorization failed: ' + params.error;
+        statusElement.className = 'error';
+        
+        // Send the error back to the opener window
+        if (window.opener && !window.opener.closed) {
+          window.opener.postMessage({
+            type: 'oauth_callback',
+            error: params.error
+          }, window.location.origin);
+          
+          // Close this window after a short delay
+          setTimeout(() => window.close(), 2000);
+        }
+      } else {
+        // No code or error parameter found
+        statusElement.textContent = 'Invalid callback URL. Missing authorization code or error message.';
+        statusElement.className = 'error';
+      }
+    }
+
+    // Run the callback processing when the page loads
+    window.addEventListener('DOMContentLoaded', processCallback);
+  </script>
+</body>
+</html>
+
