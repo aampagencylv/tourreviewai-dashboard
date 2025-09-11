@@ -1,8 +1,9 @@
 import React from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
 import { Button } from './ui/button'
+import { LogOut, User } from 'lucide-react'
 
-const Header = () => {
+const Header = ({ user, onSignOut }) => {
   const location = useLocation()
 
   const navItems = [
@@ -43,10 +44,22 @@ const Header = () => {
             </nav>
           </div>
 
-          {/* Right side - Sign Out */}
-          <div className="flex items-center">
-            <Button variant="outline" size="sm">
-              Sign Out
+          {/* Right side - User info and Sign Out */}
+          <div className="flex items-center space-x-4">
+            {user && (
+              <div className="flex items-center space-x-2 text-sm text-gray-600">
+                <User className="w-4 h-4" />
+                <span>{user.email}</span>
+              </div>
+            )}
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={onSignOut}
+              className="flex items-center space-x-2"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>Sign Out</span>
             </Button>
           </div>
         </div>
