@@ -236,6 +236,60 @@ const GoogleBusinessIntegration = () => {
     }
   }
 
+  const clearGoogleAuth = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      // Clear all Google-related data from profile
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          google_access_token: null,
+          google_refresh_token: null,
+          google_token_expires_at: null,
+          google_accounts: null,
+          google_selected_account: null,
+          google_email: null,
+          google_name: null,
+          google_business_id: null,
+          last_google_sync_at: null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_id', user.id)
+
+      if (error) throw error
+
+      // Clear local state
+      setProfile(null)
+      setBusinesses([])
+      setSelectedBusiness(null)
+
+      // Clear any Google OAuth cookies/session
+      try {
+        // Open Google logout URL in hidden iframe to clear session
+        const iframe = document.createElement('iframe')
+        iframe.style.display = 'none'
+        iframe.src = 'https://accounts.google.com/logout'
+        document.body.appendChild(iframe)
+        
+        setTimeout(() => {
+          document.body.removeChild(iframe)
+        }, 2000)
+      } catch (e) {
+        console.log('Could not clear Google session:', e)
+      }
+
+      showToast("Cleared", "Google authentication has been completely cleared. You can now try connecting again.")
+      
+      // Refresh profile data
+      setTimeout(fetchProfile, 1000)
+    } catch (error) {
+      console.error('Clear auth error:', error)
+      showToast("Clear Failed", "Failed to clear Google authentication", "destructive")
+    }
+  }
+
   const disconnectGoogle = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
@@ -363,19 +417,26 @@ const GoogleBusinessIntegration = () => {
 
           <div className="flex flex-col space-y-2">
             {!isConnected || isTokenExpired ? (
-              <Button onClick={initiateGoogleOAuth} disabled={isConnecting}>
-                {isConnecting ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Connecting...
-                  </>
-                ) : (
-                  <>
-                    <ExternalLink className="w-4 h-4 mr-2" />
-                    Connect Google My Business
-                  </>
-                )}
-              </Button>
+              <>
+                <Button onClick={initiateGoogleOAuth} disabled={isConnecting}>
+                  {isConnecting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Connecting...
+                    </>
+                  ) : (
+                    <>
+                      <ExternalLink className="w-4 h-4 mr-2" />
+                      Connect Google My Business
+                    </>
+                  )}
+                </Button>
+                
+                <Button onClick={clearGoogleAuth} variant="outline" size="sm">
+                  <XCircle className="w-4 h-4 mr-2" />
+                  Clear Google Auth
+                </Button>
+              </>
             ) : (
               <>
                 {businesses.length === 0 && (
