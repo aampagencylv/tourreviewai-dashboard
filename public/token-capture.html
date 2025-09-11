@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google OAuth Token Capture - ReviewFlow</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f8fafc;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .logo {
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+            color: #1f2937;
+            margin-bottom: 20px;
+        }
+        .status {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-weight: 500;
+        }
+        .success {
+            background: #d1fae5;
+            color: #065f46;
+            border: 1px solid #a7f3d0;
+        }
+        .error {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fca5a5;
+        }
+        .loading {
+            background: #dbeafe;
+            color: #1e40af;
+            border: 1px solid #93c5fd;
+        }
+        .button {
+            background: #3b82f6;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        .button:hover {
+            background: #2563eb;
+        }
+        .token-info {
+            background: #f3f4f6;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-family: monospace;
+            font-size: 12px;
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">ReviewFlow</div>
+        <h2>Google OAuth Token Capture</h2>
+        
+        <div id="status" class="status loading">
+            🔄 Processing OAuth tokens...
+        </div>
+        
+        <div id="tokenInfo" class="token-info" style="display: none;"></div>
+        
+        <div id="actions" style="display: none;">
+            <button class="button" onclick="redirectToDashboard()">Continue to Dashboard</button>
+            <button class="button" onclick="copyTokens()">Copy Tokens</button>
+        </div>
+    </div>
+
+    <script>
+        let extractedTokens = {};
+
+        function extractTokensFromURL() {
+            try {
+                // Extract tokens from URL hash
+                const hashParams = new URLSearchParams(window.location.hash.substring(1));
+                
+                const tokens = {
+                    access_token: hashParams.get('access_token'),
+                    provider_token: hashParams.get('provider_token'),
+                    provider_refresh_token: hashParams.get('provider_refresh_token'),
+                    expires_at: hashParams.get('expires_at'),
+                    expires_in: hashParams.get('expires_in'),
+                    refresh_token: hashParams.get('refresh_token'),
+                    token_type: hashParams.get('token_type')
+                };
+
+                if (tokens.access_token && tokens.provider_token) {
+                    extractedTokens = tokens;
+                    showSuccess();
+                    displayTokenInfo(tokens);
+                    
+                    // Automatically redirect to dashboard with tokens
+                    setTimeout(() => {
+                        redirectToDashboard();
+                    }, 3000);
+                } else {
+                    showError('No valid OAuth tokens found in URL');
+                }
+            } catch (error) {
+                showError('Error extracting tokens: ' + error.message);
+            }
+        }
+
+        function showSuccess() {
+            const status = document.getElementById('status');
+            status.className = 'status success';
+            status.innerHTML = '✅ OAuth tokens extracted successfully! Redirecting to dashboard in 3 seconds...';
+            document.getElementById('actions').style.display = 'block';
+        }
+
+        function showError(message) {
+            const status = document.getElementById('status');
+            status.className = 'status error';
+            status.innerHTML = '❌ ' + message;
+        }
+
+        function displayTokenInfo(tokens) {
+            const tokenInfo = document.getElementById('tokenInfo');
+            tokenInfo.style.display = 'block';
+            tokenInfo.innerHTML = `
+                <strong>Extracted Tokens:</strong><br>
+                Access Token: ${tokens.access_token ? tokens.access_token.substring(0, 50) + '...' : 'Not found'}<br>
+                Provider Token: ${tokens.provider_token ? tokens.provider_token.substring(0, 50) + '...' : 'Not found'}<br>
+                Refresh Token: ${tokens.provider_refresh_token ? 'Present' : 'Not found'}<br>
+                Expires: ${tokens.expires_in ? tokens.expires_in + ' seconds' : 'Unknown'}
+            `;
+        }
+
+        function redirectToDashboard() {
+            // Construct the dashboard URL with tokens as query parameters
+            const dashboardUrl = 'https://tourrevai-qfxo7m.manus.space/auth/callback';
+            const params = new URLSearchParams();
+            
+            // Add tokens as URL parameters
+            if (extractedTokens.access_token) params.set('access_token', extractedTokens.access_token);
+            if (extractedTokens.provider_token) params.set('provider_token', extractedTokens.provider_token);
+            if (extractedTokens.provider_refresh_token) params.set('provider_refresh_token', extractedTokens.provider_refresh_token);
+            if (extractedTokens.expires_at) params.set('expires_at', extractedTokens.expires_at);
+            
+            const finalUrl = `${dashboardUrl}?${params.toString()}`;
+            
+            // Redirect to dashboard
+            window.location.href = finalUrl;
+        }
+
+        function copyTokens() {
+            const tokenText = JSON.stringify(extractedTokens, null, 2);
+            navigator.clipboard.writeText(tokenText).then(() => {
+                alert('Tokens copied to clipboard!');
+            }).catch(() => {
+                // Fallback for older browsers
+                const textArea = document.createElement('textarea');
+                textArea.value = tokenText;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                alert('Tokens copied to clipboard!');
+            });
+        }
+
+        // Extract tokens when page loads
+        window.onload = extractTokensFromURL;
+    </script>
+</body>
+</html>
+

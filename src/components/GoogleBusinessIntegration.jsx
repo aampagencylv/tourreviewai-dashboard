@@ -14,7 +14,10 @@ import {
   Globe,
   Unplug,
   Settings as SettingsIcon,
-  XCircle
+  XCircle,
+  Building2,
+  MapPin,
+  Phone
 } from 'lucide-react'
 
 const GoogleBusinessIntegration = () => {
@@ -24,6 +27,12 @@ const GoogleBusinessIntegration = () => {
   const [isLoading, setIsLoading] = useState(true)
   const [businesses, setBusinesses] = useState([])
   const [selectedBusiness, setSelectedBusiness] = useState(null)
+  const [statusMessage, setStatusMessage] = useState('')
+  const [isLoadingBusinesses, setIsLoadingBusinesses] = useState(false)
+
+  useEffect(() => {
+    fetchProfile()
+  }, [])
 
   const fetchProfile = async () => {
     try {
@@ -32,7 +41,7 @@ const GoogleBusinessIntegration = () => {
 
       const { data, error } = await supabase
         .from('profiles')
-        .select('google_access_token, google_token_expires_at, last_google_sync_at, company_name, google_business_id')
+        .select('google_access_token, google_token_expires_at, last_google_sync_at, company_name, google_business_id, selected_business_id, selected_business_name')
         .eq('user_id', user.id)
         .single()
 
@@ -42,6 +51,13 @@ const GoogleBusinessIntegration = () => {
       }
 
       setProfile(data)
+      
+      if (data.selected_business_id) {
+        setSelectedBusiness({
+          id: data.selected_business_id,
+          name: data.selected_business_name
+        })
+      }
     } catch (error) {
       console.error('Error:', error)
     } finally {
@@ -49,23 +65,12 @@ const GoogleBusinessIntegration = () => {
     }
   }
 
-  useEffect(() => {
-    fetchProfile()
-  }, [])
-
-  const showToast = (title, description, variant = 'default') => {
-    // Simple toast implementation - you can replace with your preferred toast library
-    console.log(`${variant.toUpperCase()}: ${title} - ${description}`)
-    alert(`${title}: ${description}`)
-  }
-
-  const initiateGoogleOAuth = async () => {
+  const handleConnect = async () => {
     try {
       setIsConnecting(true)
+      setStatusMessage('Initiating Google OAuth...')
       
-      console.log('Starting Supabase OAuth flow...')
-      
-      // Use Supabase's built-in OAuth instead of manual implementation
+      // Use Supabase's built-in OAuth
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
@@ -79,40 +84,91 @@ const GoogleBusinessIntegration = () => {
       })
 
       if (error) {
-        console.error('Supabase OAuth error:', error)
-        throw error
+        console.error('OAuth error:', error)
+        setStatusMessage('OAuth authentication failed: ' + error.message)
+      } else {
+        console.log('OAuth initiated successfully:', data)
+        setStatusMessage('Redirecting to Google for authentication...')
       }
-
-      console.log('Supabase OAuth initiated successfully:', data)
-      
-      // The OAuth flow will redirect automatically
-      // No need to handle popups or manual callbacks
-      
     } catch (error) {
-      console.error('OAuth initiation failed:', error)
-      showToast("OAuth Failed", error.message || "Failed to initiate Google OAuth", "destructive")
+      console.error('Connection error:', error)
+      setStatusMessage('Connection failed: ' + error.message)
+    } finally {
       setIsConnecting(false)
     }
   }
 
   const fetchBusinessListings = async () => {
     try {
-      setIsFetching(true)
+      setIsLoadingBusinesses(true)
+      setStatusMessage('Fetching your business listings...')
 
-      const { data, error } = await supabase.functions.invoke('fetch-business-listings')
-      
-      if (error) {
-        throw new Error(error.message)
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('User not authenticated')
+
+      if (!profile?.google_access_token) {
+        throw new Error('No Google access token found')
       }
 
-      setBusinesses(data.businesses || [])
-      showToast("Success", `Found ${data.businesses?.length || 0} business listings`)
+      // Call Google My Business API to get business listings
+      const response = await fetch('https://mybusinessaccountmanagement.googleapis.com/v1/accounts', {
+        headers: {
+          'Authorization': `Bearer ${profile.google_access_token}`,
+          'Content-Type': 'application/json'
+        }
+      })
 
+      if (!response.ok) {
+        throw new Error(`Google API error: ${response.status} ${response.statusText}`)
+      }
+
+      const data = await response.json()
+      console.log('Google My Business accounts:', data)
+
+      if (data.accounts && data.accounts.length > 0) {
+        // For each account, fetch the locations (businesses)
+        const allBusinesses = []
+        
+        for (const account of data.accounts) {
+          try {
+            const locationsResponse = await fetch(`https://mybusinessbusinessinformation.googleapis.com/v1/${account.name}/locations`, {
+              headers: {
+                'Authorization': `Bearer ${profile.google_access_token}`,
+                'Content-Type': 'application/json'
+              }
+            })
+
+            if (locationsResponse.ok) {
+              const locationsData = await locationsResponse.json()
+              if (locationsData.locations) {
+                allBusinesses.push(...locationsData.locations.map(location => ({
+                  id: location.name,
+                  name: location.title || location.storefrontAddress?.addressLines?.[0] || 'Unnamed Business',
+                  address: location.storefrontAddress ? 
+                    `${location.storefrontAddress.addressLines?.join(', ') || ''}, ${location.storefrontAddress.locality || ''}, ${location.storefrontAddress.administrativeArea || ''}`.replace(/^,\s*/, '') : 
+                    'No address',
+                  phone: location.primaryPhone || 'No phone',
+                  website: location.websiteUri || 'No website',
+                  account: account.accountName || account.name
+                })))
+              }
+            }
+          } catch (locationError) {
+            console.error('Error fetching locations for account:', account.name, locationError)
+          }
+        }
+
+        setBusinesses(allBusinesses)
+        setStatusMessage(`Found ${allBusinesses.length} business listing(s)`)
+      } else {
+        setBusinesses([])
+        setStatusMessage('No business listings found')
+      }
     } catch (error) {
-      console.error('Fetch businesses error:', error)
-      showToast("Fetch Failed", error.message || "Failed to fetch business listings", "destructive")
+      console.error('Error fetching business listings:', error)
+      setStatusMessage('Error fetching business listings: ' + error.message)
     } finally {
-      setIsFetching(false)
+      setIsLoadingBusinesses(false)
     }
   }
 
@@ -121,291 +177,314 @@ const GoogleBusinessIntegration = () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
+      // Store selected business in user profile
       const { error } = await supabase
         .from('profiles')
         .update({
-          google_business_id: business.name,
-          company_name: business.title
+          selected_business_id: business.id,
+          selected_business_name: business.name,
+          updated_at: new Date().toISOString()
         })
         .eq('user_id', user.id)
 
-      if (error) throw error
-
-      setSelectedBusiness(business)
-      showToast("Success", `Selected business: ${business.title}`)
-      fetchProfile()
-
+      if (error) {
+        console.error('Error saving selected business:', error)
+        setStatusMessage('Error saving selected business')
+      } else {
+        setSelectedBusiness(business)
+        setStatusMessage(`Selected business: ${business.name}`)
+        // Refresh profile to get updated data
+        fetchProfile()
+      }
     } catch (error) {
-      console.error('Select business error:', error)
-      showToast("Selection Failed", "Failed to select business", "destructive")
+      console.error('Error selecting business:', error)
+      setStatusMessage('Error selecting business')
     }
   }
 
-  const fetchBusinessProfileReviews = async () => {
+  const handleDisconnect = async () => {
     try {
-      setIsFetching(true)
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
 
-      const { data, error } = await supabase.functions.invoke('fetch-business-profile-reviews')
-      
+      // Clear Google tokens from user profile
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          google_access_token: null,
+          google_refresh_token: null,
+          google_token_expires_at: null,
+          selected_business_id: null,
+          selected_business_name: null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_id', user.id)
+
       if (error) {
-        throw new Error(error.message)
+        console.error('Error disconnecting:', error)
+      } else {
+        setProfile(null)
+        setBusinesses([])
+        setSelectedBusiness(null)
+        setStatusMessage('Disconnected from Google My Business')
+        fetchProfile()
       }
-
-      showToast("Success", `Found ${data.reviewsFound} reviews, stored ${data.reviewsStored} new/updated reviews.`)
-
-      // Refresh profile to update sync time
-      fetchProfile()
-
     } catch (error) {
-      console.error('Fetch reviews error:', error)
-      showToast("Fetch Failed", error.message || "Failed to fetch Business Profile reviews", "destructive")
-    } finally {
-      setIsFetching(false)
+      console.error('Error disconnecting:', error)
     }
   }
 
   const clearGoogleAuth = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-
-      // Clear all Google-related data from profile
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          google_access_token: null,
-          google_refresh_token: null,
-          google_token_expires_at: null,
-          google_accounts: null,
-          google_selected_account: null,
-          google_email: null,
-          google_name: null,
-          google_business_id: null,
-          last_google_sync_at: null,
-          updated_at: new Date().toISOString()
-        })
-        .eq('user_id', user.id)
-
-      if (error) throw error
-
-      // Clear local state
-      setProfile(null)
-      setBusinesses([])
-      setSelectedBusiness(null)
-
-      // Clear any Google OAuth cookies/session
-      try {
-        // Open Google logout URL in hidden iframe to clear session
-        const iframe = document.createElement('iframe')
-        iframe.style.display = 'none'
-        iframe.src = 'https://accounts.google.com/logout'
-        document.body.appendChild(iframe)
-        
-        setTimeout(() => {
-          document.body.removeChild(iframe)
-        }, 2000)
-      } catch (e) {
-        console.log('Could not clear Google session:', e)
-      }
-
-      showToast("Cleared", "Google authentication has been completely cleared. You can now try connecting again.")
+      // Clear local storage and session storage
+      localStorage.clear()
+      sessionStorage.clear()
       
-      // Refresh profile data
-      setTimeout(fetchProfile, 1000)
+      // Sign out from Supabase
+      await supabase.auth.signOut()
+      
+      // Clear Google auth by opening logout iframe
+      const iframe = document.createElement('iframe')
+      iframe.style.display = 'none'
+      iframe.src = 'https://accounts.google.com/logout'
+      document.body.appendChild(iframe)
+      
+      setTimeout(() => {
+        document.body.removeChild(iframe)
+      }, 1000)
+      
+      setStatusMessage('Google authentication cleared. Please refresh the page and sign in again.')
     } catch (error) {
-      console.error('Clear auth error:', error)
-      showToast("Clear Failed", "Failed to clear Google authentication", "destructive")
-    }
-  }
-
-  const disconnectGoogle = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          google_access_token: null,
-          google_refresh_token: null,
-          google_token_expires_at: null,
-          google_business_id: null
-        })
-        .eq('user_id', user.id)
-
-      if (error) throw error
-
-      showToast("Disconnected", "Google Business Profile has been disconnected from your account.")
-      setBusinesses([])
-      setSelectedBusiness(null)
-      fetchProfile()
-    } catch (error) {
-      console.error('Disconnect error:', error)
-      showToast("Disconnect Failed", "Failed to disconnect Google Business Profile", "destructive")
+      console.error('Error clearing Google auth:', error)
+      setStatusMessage('Error clearing authentication')
     }
   }
 
   if (isLoading) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Loader2 className="h-5 w-5 animate-spin" />
-            Loading Google Business Profile Integration...
-          </CardTitle>
-        </CardHeader>
-      </Card>
+      <div className="flex items-center justify-center p-8">
+        <Loader2 className="h-6 w-6 animate-spin mr-2" />
+        <span>Loading Google My Business integration...</span>
+      </div>
     )
   }
 
-  const isConnected = !!profile?.google_access_token
-  const isTokenExpired = profile?.google_token_expires_at 
-    ? new Date(profile.google_token_expires_at) < new Date() 
-    : false
+  const isConnected = profile?.google_access_token
 
   return (
-    <Card>
-      <CardContent className="p-6">
-        <div className="flex items-start justify-between">
-          <div className="flex items-start space-x-4">
-            <div className="p-3 bg-blue-100 rounded-lg">
-              <Globe className="w-6 h-6 text-blue-600" />
-            </div>
-            <div className="flex-1">
-              <div className="flex items-center space-x-2 mb-2">
-                <h3 className="text-lg font-semibold">Google My Business</h3>
-                <Badge className={isConnected && !isTokenExpired ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}>
-                  {isConnected && !isTokenExpired ? 'active' : 'disconnected'}
-                </Badge>
-              </div>
-              <p className="text-gray-600 mb-4">
-                Connect your Google My Business account to sync reviews and enable reply functionality
-              </p>
-              
-              <div className="flex items-center space-x-2 mb-4">
-                {isConnected && !isTokenExpired ? (
-                  <CheckCircle className="w-4 h-4 text-green-500" />
-                ) : (
-                  <XCircle className="w-4 h-4 text-gray-400" />
-                )}
-                <span className="text-sm text-gray-600">
-                  {isConnected && !isTokenExpired ? 'Connected' : 'Not Connected'}
-                </span>
-                {profile?.last_google_sync_at && (
-                  <span className="text-sm text-gray-500">
-                    • Last sync: {new Date(profile.last_google_sync_at).toLocaleDateString()}
-                  </span>
-                )}
-              </div>
-
-              {isTokenExpired && (
-                <Alert className="mb-4 border-red-200 bg-red-50">
-                  <AlertCircle className="h-4 w-4 text-red-600" />
-                  <AlertDescription className="text-red-700">
-                    Your access token has expired. Please reconnect to continue.
-                  </AlertDescription>
-                </Alert>
+    <div className="space-y-6">
+      {/* Connection Status */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Globe className="h-5 w-5" />
+            Google My Business Integration
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              {isConnected ? (
+                <>
+                  <CheckCircle className="h-5 w-5 text-green-500" />
+                  <span className="text-green-700">Connected</span>
+                  <Badge variant="secondary">Active</Badge>
+                </>
+              ) : (
+                <>
+                  <XCircle className="h-5 w-5 text-red-500" />
+                  <span className="text-red-700">Not Connected</span>
+                  <Badge variant="destructive">Inactive</Badge>
+                </>
               )}
+            </div>
+            
+            <div className="flex gap-2">
+              {isConnected ? (
+                <>
+                  <Button 
+                    onClick={fetchBusinessListings}
+                    disabled={isLoadingBusinesses}
+                    variant="outline"
+                    size="sm"
+                  >
+                    {isLoadingBusinesses ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    ) : (
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                    )}
+                    Fetch Businesses
+                  </Button>
+                  <Button 
+                    onClick={handleDisconnect}
+                    variant="outline"
+                    size="sm"
+                  >
+                    <Unplug className="h-4 w-4 mr-2" />
+                    Disconnect
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button 
+                    onClick={handleConnect}
+                    disabled={isConnecting}
+                    size="sm"
+                  >
+                    {isConnecting ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    ) : (
+                      <ExternalLink className="h-4 w-4 mr-2" />
+                    )}
+                    Connect Google My Business
+                  </Button>
+                  <Button 
+                    onClick={clearGoogleAuth}
+                    variant="outline"
+                    size="sm"
+                  >
+                    <XCircle className="h-4 w-4 mr-2" />
+                    Clear Google Auth
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
 
-              <div className="mb-4">
-                <h4 className="text-sm font-medium text-gray-900 mb-2">Features</h4>
-                <div className="flex flex-wrap gap-2">
-                  {['Review Sync', 'Reply to Reviews', 'Profile Management', 'Analytics', 'OAuth Authentication'].map((feature, index) => (
-                    <Badge key={index} variant="outline" className="text-xs">
-                      {feature}
-                    </Badge>
-                  ))}
-                </div>
+          {statusMessage && (
+            <Alert>
+              <Info className="h-4 w-4" />
+              <AlertDescription>{statusMessage}</AlertDescription>
+            </Alert>
+          )}
+
+          {/* Token Capture Instructions */}
+          {!isConnected && (
+            <Alert>
+              <Info className="h-4 w-4" />
+              <AlertDescription>
+                <strong>Note:</strong> If you get redirected to localhost:3000, copy that URL and visit: 
+                <br />
+                <code className="bg-gray-100 px-2 py-1 rounded text-sm">
+                  https://tourrevai-qfxo7m.manus.space/token-capture.html
+                </code>
+                <br />
+                Then paste the localhost URL in the address bar to extract your tokens.
+              </AlertDescription>
+            </Alert>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Selected Business */}
+      {selectedBusiness && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Building2 className="h-5 w-5" />
+              Selected Business
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-semibold">{selectedBusiness.name}</h3>
+                <p className="text-sm text-gray-600">Business ID: {selectedBusiness.id}</p>
               </div>
+              <Badge variant="secondary">Active</Badge>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
-              {/* Business Selection */}
-              {isConnected && !isTokenExpired && businesses.length > 0 && (
-                <div className="mb-4">
-                  <h4 className="text-sm font-medium text-gray-900 mb-2">Select Your Business</h4>
-                  <div className="space-y-2">
-                    {businesses.map((business, index) => (
-                      <div 
-                        key={index}
-                        className={`p-3 border rounded-lg cursor-pointer transition-colors ${
-                          profile?.google_business_id === business.name 
-                            ? 'border-blue-500 bg-blue-50' 
-                            : 'border-gray-200 hover:border-gray-300'
-                        }`}
-                        onClick={() => selectBusiness(business)}
-                      >
-                        <div className="font-medium">{business.title}</div>
-                        <div className="text-sm text-gray-500">{business.name}</div>
+      {/* Business Listings */}
+      {businesses.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Building2 className="h-5 w-5" />
+              Your Business Listings ({businesses.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {businesses.map((business) => (
+                <div 
+                  key={business.id} 
+                  className={`p-4 border rounded-lg cursor-pointer transition-colors ${
+                    selectedBusiness?.id === business.id 
+                      ? 'border-blue-500 bg-blue-50' 
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                  onClick={() => selectBusiness(business)}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-lg">{business.name}</h3>
+                      <div className="mt-2 space-y-1 text-sm text-gray-600">
+                        <div className="flex items-center gap-2">
+                          <MapPin className="h-4 w-4" />
+                          <span>{business.address}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Phone className="h-4 w-4" />
+                          <span>{business.phone}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Globe className="h-4 w-4" />
+                          <span>{business.website}</span>
+                        </div>
                       </div>
-                    ))}
+                      <div className="mt-2">
+                        <Badge variant="outline" className="text-xs">
+                          {business.account}
+                        </Badge>
+                      </div>
+                    </div>
+                    <div className="ml-4">
+                      {selectedBusiness?.id === business.id ? (
+                        <Badge variant="default">Selected</Badge>
+                      ) : (
+                        <Button variant="outline" size="sm">
+                          Select
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </div>
-              )}
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Features */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Features</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="text-center p-3 border rounded-lg">
+              <RefreshCw className="h-6 w-6 mx-auto mb-2 text-blue-500" />
+              <div className="text-sm font-medium">Review Sync</div>
+            </div>
+            <div className="text-center p-3 border rounded-lg">
+              <ExternalLink className="h-6 w-6 mx-auto mb-2 text-green-500" />
+              <div className="text-sm font-medium">Reply to Reviews</div>
+            </div>
+            <div className="text-center p-3 border rounded-lg">
+              <SettingsIcon className="h-6 w-6 mx-auto mb-2 text-purple-500" />
+              <div className="text-sm font-medium">Profile Management</div>
+            </div>
+            <div className="text-center p-3 border rounded-lg">
+              <Info className="h-6 w-6 mx-auto mb-2 text-orange-500" />
+              <div className="text-sm font-medium">Analytics</div>
             </div>
           </div>
-
-          <div className="flex flex-col space-y-2">
-            {!isConnected || isTokenExpired ? (
-              <>
-                <Button onClick={initiateGoogleOAuth} disabled={isConnecting}>
-                  {isConnecting ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Connecting...
-                    </>
-                  ) : (
-                    <>
-                      <ExternalLink className="w-4 h-4 mr-2" />
-                      Connect Google My Business
-                    </>
-                  )}
-                </Button>
-                
-                <Button onClick={clearGoogleAuth} variant="outline" size="sm">
-                  <XCircle className="w-4 h-4 mr-2" />
-                  Clear Google Auth
-                </Button>
-              </>
-            ) : (
-              <>
-                {businesses.length === 0 && (
-                  <Button onClick={fetchBusinessListings} disabled={isFetching} variant="outline" size="sm">
-                    {isFetching ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Loading...
-                      </>
-                    ) : (
-                      'Load Businesses'
-                    )}
-                  </Button>
-                )}
-                <Button onClick={fetchBusinessProfileReviews} disabled={isFetching} variant="outline" size="sm">
-                  {isFetching ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Syncing...
-                    </>
-                  ) : (
-                    <>
-                      <RefreshCw className="w-4 h-4 mr-2" />
-                      Sync Now
-                    </>
-                  )}
-                </Button>
-                <Button variant="outline" size="sm">
-                  <SettingsIcon className="w-4 h-4 mr-2" />
-                  Configure
-                </Button>
-                <Button onClick={disconnectGoogle} variant="outline" size="sm">
-                  <Unplug className="w-4 h-4 mr-2" />
-                  Disconnect
-                </Button>
-              </>
-            )}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </div>
   )
 }
 
