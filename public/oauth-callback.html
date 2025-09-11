@@ -78,44 +78,80 @@
       
       if (params.code) {
         // Success - we got an authorization code
-        statusElement.textContent = 'Authorization successful! You can close this window.';
+        statusElement.textContent = 'Authorization successful! Connecting your Google My Business account...';
         statusElement.className = 'success';
         
-        // Display the code (for debugging purposes)
-        codeElement.textContent = params.code;
+        console.log('OAuth callback: Authorization code received:', params.code);
         
-        // Send the code back to the opener window
+        // Send the code back to the opener window with the correct message type
         if (window.opener && !window.opener.closed) {
+          console.log('OAuth callback: Sending success message to parent window');
           window.opener.postMessage({
-            type: 'oauth_callback',
-            code: params.code
-          }, window.location.origin);
+            type: 'GOOGLE_OAUTH_SUCCESS',
+            code: params.code,
+            state: params.state
+          }, '*');
           
-          // Close this window after a short delay
-          setTimeout(() => window.close(), 2000);
+          // Update status and close window
+          statusElement.textContent = 'Successfully connected! This window will close automatically...';
+          setTimeout(() => {
+            try {
+              window.close();
+            } catch (e) {
+              console.log('Could not close window automatically');
+            }
+          }, 1500);
         } else {
-          statusElement.textContent = 'Authorization successful, but the opener window is no longer available.';
+          statusElement.textContent = 'Authorization successful! Please return to the main window.';
           codeContainer.style.display = 'block';
+          codeElement.textContent = params.code;
         }
       } else if (params.error) {
         // Error occurred
-        statusElement.textContent = 'Authorization failed: ' + params.error;
+        statusElement.textContent = 'Authorization failed: ' + (params.error_description || params.error);
         statusElement.className = 'error';
+        
+        console.log('OAuth callback: Error received:', params.error, params.error_description);
         
         // Send the error back to the opener window
         if (window.opener && !window.opener.closed) {
           window.opener.postMessage({
-            type: 'oauth_callback',
-            error: params.error
-          }, window.location.origin);
+            type: 'GOOGLE_OAUTH_ERROR',
+            error: params.error,
+            error_description: params.error_description
+          }, '*');
           
           // Close this window after a short delay
-          setTimeout(() => window.close(), 2000);
+          setTimeout(() => {
+            try {
+              window.close();
+            } catch (e) {
+              console.log('Could not close window automatically');
+            }
+          }, 3000);
         }
       } else {
         // No code or error parameter found
+        console.log('OAuth callback: No code or error found in URL params:', params);
         statusElement.textContent = 'Invalid callback URL. Missing authorization code or error message.';
         statusElement.className = 'error';
+        
+        // Show debug information
+        const debugInfo = document.createElement('div');
+        debugInfo.innerHTML = `
+          <p><strong>Debug Information:</strong></p>
+          <p>Current URL: ${window.location.href}</p>
+          <p>URL Parameters: ${JSON.stringify(params)}</p>
+          <p>Please check that the redirect URI in Google Cloud Console matches exactly:</p>
+          <p><code>${window.location.origin}/oauth-callback.html</code></p>
+        `;
+        debugInfo.style.marginTop = '20px';
+        debugInfo.style.textAlign = 'left';
+        debugInfo.style.fontSize = '12px';
+        debugInfo.style.backgroundColor = '#f9f9f9';
+        debugInfo.style.padding = '10px';
+        debugInfo.style.borderRadius = '4px';
+        document.querySelector('.container').appendChild(debugInfo);
       }
     }
 
