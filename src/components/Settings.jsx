@@ -6,6 +6,7 @@ import { Textarea } from './ui/textarea'
 import { Badge } from './ui/badge'
 import { Switch } from './ui/switch'
 import { Label } from './ui/label'
+import GoogleBusinessIntegration from './GoogleBusinessIntegration'
 import { 
   Building2, 
   Plug, 
@@ -154,75 +155,8 @@ const Settings = () => {
 
   const renderIntegrations = () => (
     <div className="space-y-6">
-      {/* Google My Business */}
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex items-start justify-between">
-            <div className="flex items-start space-x-4">
-              <div className="p-3 bg-blue-100 rounded-lg">
-                <Globe className="w-6 h-6 text-blue-600" />
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center space-x-2 mb-2">
-                  <h3 className="text-lg font-semibold">Google My Business</h3>
-                  <Badge className={integrations.googleMyBusiness.connected ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}>
-                    {integrations.googleMyBusiness.status}
-                  </Badge>
-                </div>
-                <p className="text-gray-600 mb-4">
-                  Connect your Google My Business account to sync reviews and enable reply functionality
-                </p>
-                
-                <div className="flex items-center space-x-2 mb-4">
-                  {integrations.googleMyBusiness.connected ? (
-                    <CheckCircle className="w-4 h-4 text-green-500" />
-                  ) : (
-                    <XCircle className="w-4 h-4 text-gray-400" />
-                  )}
-                  <span className="text-sm text-gray-600">
-                    {integrations.googleMyBusiness.connected ? 'Connected' : 'Not Connected'}
-                  </span>
-                </div>
-
-                <div className="mb-4">
-                  <h4 className="text-sm font-medium text-gray-900 mb-2">Features</h4>
-                  <div className="flex flex-wrap gap-2">
-                    {integrations.googleMyBusiness.features.map((feature, index) => (
-                      <Badge key={index} variant="outline" className="text-xs">
-                        {feature}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex flex-col space-y-2">
-              {integrations.googleMyBusiness.connected ? (
-                <>
-                  <Button variant="outline" size="sm">
-                    <RefreshCw className="w-4 h-4 mr-2" />
-                    Sync Now
-                  </Button>
-                  <Button variant="outline" size="sm">
-                    <SettingsIcon className="w-4 h-4 mr-2" />
-                    Configure
-                  </Button>
-                  <Button variant="outline" size="sm">
-                    <Unplug className="w-4 h-4 mr-2" />
-                    Disconnect
-                  </Button>
-                </>
-              ) : (
-                <Button>
-                  <Plug className="w-4 h-4 mr-2" />
-                  Connect Google My Business
-                </Button>
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Google My Business - Real OAuth Integration */}
+      <GoogleBusinessIntegration />
 
       {/* TripAdvisor */}
       <Card>
