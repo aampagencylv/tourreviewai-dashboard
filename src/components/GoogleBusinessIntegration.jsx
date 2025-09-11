@@ -62,107 +62,35 @@ const GoogleBusinessIntegration = () => {
   const initiateGoogleOAuth = async () => {
     try {
       setIsConnecting(true)
-
-      // Get current user
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        throw new Error('User not authenticated')
-      }
-
-      // Generate OAuth URL client-side (since backend functions expect different parameters)
-      const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '1234567890-abcdefghijklmnopqrstuvwxyz.apps.googleusercontent.com'
-      const redirectUri = `${window.location.origin}/oauth-callback.html`
       
-      // Updated scopes - removed deprecated plus.business.manage
-      const scopes = [
-        'https://www.googleapis.com/auth/business.manage',
-        'openid',
-        'email',
-        'profile'
-      ].join(' ')
-
-      const params = new URLSearchParams({
-        client_id: clientId,
-        redirect_uri: redirectUri,
-        response_type: 'code',
-        scope: scopes,
-        access_type: 'offline',
-        prompt: 'consent',
-        state: user.id, // Pass user ID as state for callback
-        include_granted_scopes: 'true' // Include previously granted scopes
+      console.log('Starting Supabase OAuth flow...')
+      
+      // Use Supabase's built-in OAuth instead of manual implementation
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          scopes: 'https://www.googleapis.com/auth/business.manage email profile openid',
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
+          redirectTo: `${window.location.origin}/auth/callback`
+        }
       })
 
-      const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`
-      
-      console.log('OAuth Debug Info:')
-      console.log('- Client ID:', clientId)
-      console.log('- Redirect URI:', redirectUri)
-      console.log('- Scopes:', scopes)
-      console.log('- User ID (state):', user.id)
-      console.log('- Full OAuth URL:', authUrl)
-      
-      console.log('Opening OAuth URL:', authUrl)
-      
-      // Open OAuth popup window
-      const popup = window.open(
-        authUrl,
-        'google_oauth',
-        'width=600,height=600,scrollbars=yes,resizable=yes'
-      )
-
-      if (!popup || popup.closed || typeof popup.closed === 'undefined') {
-        throw new Error('Popup blocked! Please allow popups for this site and try again.')
+      if (error) {
+        console.error('Supabase OAuth error:', error)
+        throw error
       }
 
-      // Set up message listener for the OAuth callback
-      const handleMessage = (event) => {
-        console.log('OAuth parent: Received message:', event.data)
-        
-        if (event.data?.type === 'GOOGLE_OAUTH_SUCCESS') {
-          console.log('OAuth parent: Success callback received, cleaning up')
-          window.removeEventListener('message', handleMessage)
-          
-          // Close the popup
-          try { if (popup && !popup.closed) popup.close() } catch {}
-          
-          showToast("Success", "Google Business Profile connected successfully!")
-          // Refresh profile data after OAuth completion
-          setTimeout(fetchProfile, 1000)
-          // Fetch business listings
-          setTimeout(fetchBusinessListings, 2000)
-          setIsConnecting(false)
-        } else if (event.data?.type === 'GOOGLE_OAUTH_ERROR') {
-          console.log('OAuth parent: Error callback received:', event.data)
-          window.removeEventListener('message', handleMessage)
-          
-          // Close the popup
-          try { if (popup && !popup.closed) popup.close() } catch {}
-          
-          const errorMsg = event.data.error_description || event.data.error || 'OAuth authorization failed'
-          showToast("OAuth Failed", errorMsg, "destructive")
-          setIsConnecting(false)
-        } else if (event.data?.type === 'OAUTH_DEBUG') {
-          console.log('OAuth Debug from callback:', event.data)
-        }
-      }
+      console.log('Supabase OAuth initiated successfully:', data)
       
-      console.log('OAuth parent: Setting up message listener')
-      window.addEventListener('message', handleMessage)
+      // The OAuth flow will redirect automatically
+      // No need to handle popups or manual callbacks
       
-      // Fallback: check if popup is closed manually
-      const checkPopup = setInterval(() => {
-        if (popup?.closed) {
-          clearInterval(checkPopup)
-          window.removeEventListener('message', handleMessage)
-          setIsConnecting(false)
-          // Refresh profile data after OAuth completion
-          setTimeout(fetchProfile, 1000)
-        }
-      }, 1000)
-
     } catch (error) {
-      console.error('OAuth initiation error:', error)
-      showToast("Connection Failed", error.message || "Failed to connect to Google Business Profile", "destructive")
+      console.error('OAuth initiation failed:', error)
+      showToast("OAuth Failed", error.message || "Failed to initiate Google OAuth", "destructive")
       setIsConnecting(false)
     }
   }

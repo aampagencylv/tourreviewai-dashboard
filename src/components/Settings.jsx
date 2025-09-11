@@ -1,4 +1,5 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
+import { useLocation } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
@@ -26,7 +27,48 @@ import {
 } from 'lucide-react'
 
 const Settings = () => {
+  const location = useLocation()
   const [activeTab, setActiveTab] = useState('business-profile')
+  
+  // Handle OAuth callback messages
+  useEffect(() => {
+    const urlParams = new URLSearchParams(location.search)
+    const success = urlParams.get('success')
+    const error = urlParams.get('error')
+    
+    if (success === 'google_connected') {
+      console.log('OAuth success: Google My Business connected!')
+      // Show success message
+      alert('Success: Google My Business connected successfully!')
+      // Switch to integrations tab
+      setActiveTab('integrations')
+      // Clean up URL
+      window.history.replaceState({}, '', '/settings')
+    } else if (error) {
+      console.error('OAuth error:', error)
+      let errorMessage = 'OAuth authentication failed'
+      switch (error) {
+        case 'oauth_failed':
+          errorMessage = 'OAuth authentication was denied or failed'
+          break
+        case 'code_exchange_failed':
+          errorMessage = 'Failed to exchange authorization code for tokens'
+          break
+        case 'no_code':
+          errorMessage = 'No authorization code received from Google'
+          break
+        case 'unexpected':
+          errorMessage = 'An unexpected error occurred during authentication'
+          break
+      }
+      alert(`Error: ${errorMessage}`)
+      // Switch to integrations tab to show the error
+      setActiveTab('integrations')
+      // Clean up URL
+      window.history.replaceState({}, '', '/settings')
+    }
+  }, [location])
+
   const [businessProfile, setBusinessProfile] = useState({
     businessName: 'Las Vegas Slingshot Tours',
     website: 'https://lvslingshotours.com',

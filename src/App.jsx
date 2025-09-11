@@ -6,6 +6,7 @@ import Dashboard from './components/Dashboard'
 import Contacts from './components/Contacts'
 import Collect from './components/Collect'
 import Settings from './components/Settings'
+import AuthCallback from './pages/AuthCallback'
 import './App.css'
 
 function AppContent({ user, onSignOut }) {
@@ -19,6 +20,7 @@ function AppContent({ user, onSignOut }) {
             <Route path="/contacts" element={<Contacts />} />
             <Route path="/collect" element={<Collect />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/auth/callback" element={<AuthCallback />} />
           </Routes>
         </main>
       </div>
