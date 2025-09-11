@@ -36,6 +36,27 @@ const GoogleBusinessIntegration = () => {
     fetchProfile()
   }, [])
 
+  // Handle URL parameters after OAuth redirect
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search)
+    const success = urlParams.get('success')
+    const error = urlParams.get('error')
+
+    if (success === 'google_business_connected') {
+      setStatusMessage('Google My Business connected successfully!')
+      // Refresh profile to get updated tokens
+      setTimeout(() => {
+        fetchProfile()
+      }, 1000)
+      // Clear URL parameters
+      window.history.replaceState({}, document.title, window.location.pathname)
+    } else if (error) {
+      setStatusMessage(`OAuth error: ${error}`)
+      // Clear URL parameters
+      window.history.replaceState({}, document.title, window.location.pathname)
+    }
+  }, [])
+
   const fetchProfile = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
@@ -60,6 +81,12 @@ const GoogleBusinessIntegration = () => {
           name: data.selected_business_name
         })
       }
+
+      // Auto-fetch businesses if connected but no businesses loaded
+      if (data.google_access_token && businesses.length === 0) {
+        console.log('Auto-fetching businesses after connection detected')
+        fetchBusinessListings()
+      }
     } catch (error) {
       console.error('Error:', error)
     } finally {
@@ -70,32 +97,38 @@ const GoogleBusinessIntegration = () => {
   const handleConnect = async () => {
     try {
       setIsConnecting(true)
-      setStatusMessage('Initiating Google OAuth...')
+      setStatusMessage('Initiating Google My Business OAuth...')
       
-      // Use Supabase's built-in OAuth
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          scopes: 'https://www.googleapis.com/auth/business.manage email profile openid',
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'consent',
-          },
-          redirectTo: 'https://tourrevai-qfxo7m.manus.space/auth/callback'
-        }
-      })
-
-      if (error) {
-        console.error('OAuth error:', error)
-        setStatusMessage('OAuth authentication failed: ' + error.message)
-      } else {
-        console.log('OAuth initiated successfully:', data)
-        setStatusMessage('Redirecting to Google for authentication...')
-      }
+      // Generate state parameter for security
+      const state = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
+      
+      // Store state in sessionStorage for verification
+      sessionStorage.setItem('google_oauth_state', state)
+      
+      // Build OAuth URL for Google My Business scopes
+      const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '665535211710-t2chb5uja0k2kcv39bugg88mo5vg33bu.apps.googleusercontent.com'
+      const redirectUri = encodeURIComponent(import.meta.env.VITE_GOOGLE_REDIRECT_URI || 'https://tourrevai-qfxo7m.manus.space/auth/callback')
+      const scopes = encodeURIComponent('https://www.googleapis.com/auth/business.manage openid email profile')
+      
+      const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
+        `client_id=${clientId}&` +
+        `redirect_uri=${redirectUri}&` +
+        `response_type=code&` +
+        `scope=${scopes}&` +
+        `access_type=offline&` +
+        `prompt=consent&` +
+        `state=${state}&` +
+        `include_granted_scopes=true`
+      
+      console.log('Google My Business OAuth URL:', authUrl)
+      setStatusMessage('Opening Google My Business authorization...')
+      
+      // Open OAuth in current window (not popup)
+      window.location.href = authUrl
+      
     } catch (error) {
       console.error('Connection error:', error)
       setStatusMessage('Connection failed: ' + error.message)
-    } finally {
       setIsConnecting(false)
     }
   }

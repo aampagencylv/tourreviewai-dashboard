@@ -56,7 +56,7 @@ serve(async (req) => {
     // Google OAuth configuration
     const clientId = Deno.env.get('GOOGLE_CLIENT_ID')
     const clientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET')
-    const redirectUri = Deno.env.get('GOOGLE_REDIRECT_URI') || `${new URL(req.url).origin}/oauth-callback.html`
+    const redirectUri = Deno.env.get('GOOGLE_REDIRECT_URI') || 'https://tourrevai-qfxo7m.manus.space/auth/callback'
 
     if (!clientId || !clientSecret) {
       throw new Error('Google OAuth credentials not configured')

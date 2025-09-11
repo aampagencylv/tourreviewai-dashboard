@@ -35,7 +35,7 @@ serve(async (req) => {
 
     // Google OAuth configuration
     const clientId = Deno.env.get('GOOGLE_CLIENT_ID')
-    const redirectUri = Deno.env.get('GOOGLE_REDIRECT_URI') || `${new URL(req.url).origin}/oauth-callback.html`
+    const redirectUri = Deno.env.get('GOOGLE_REDIRECT_URI') || 'https://tourrevai-qfxo7m.manus.space/auth/callback'
     
     if (!clientId) {
       throw new Error('Google Client ID not configured')
@@ -44,7 +44,6 @@ serve(async (req) => {
     // Google Business Profile OAuth scopes
     const scopes = [
       'https://www.googleapis.com/auth/business.manage',
-      'https://www.googleapis.com/auth/plus.business.manage',
       'openid',
       'email',
       'profile'

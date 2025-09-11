@@ -86,8 +86,9 @@ const AuthCallback = () => {
           return
         }
         
-        // Check for authorization code (PKCE flow)
+        // Check for authorization code (Google My Business OAuth)
         const code = urlParams.get('code')
+        const state = urlParams.get('state')
         const error = urlParams.get('error')
         
         if (error) {
@@ -97,43 +98,55 @@ const AuthCallback = () => {
         }
 
         if (code) {
-          console.log('Auth callback: Authorization code received, exchanging for session...')
+          console.log('Auth callback: Authorization code received, exchanging for tokens...')
           
-          // Exchange the code for a session
-          const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
-          
-          if (exchangeError) {
-            console.error('Auth callback: Code exchange error:', exchangeError)
-            navigate('/settings?error=code_exchange_failed')
+          // Verify state parameter
+          const storedState = sessionStorage.getItem('google_oauth_state')
+          if (state !== storedState) {
+            console.error('Auth callback: State parameter mismatch')
+            navigate('/settings?error=state_mismatch')
             return
           }
-
-          console.log('Auth callback: Session created successfully:', data)
           
-          // Extract provider tokens if available
-          if (data.session?.provider_token) {
-            console.log('Auth callback: Provider token received')
+          // Clear stored state
+          sessionStorage.removeItem('google_oauth_state')
+          
+          try {
+            // Use Supabase function for secure token exchange
+            const { data: { user } } = await supabase.auth.getUser()
             
-            // Store the Google tokens in the user's profile
-            const { error: updateError } = await supabase
-              .from('profiles')
-              .update({
-                google_access_token: data.session.provider_token,
-                google_refresh_token: data.session.provider_refresh_token,
-                google_token_expires_at: new Date(Date.now() + 3600 * 1000).toISOString(), // 1 hour from now
-                updated_at: new Date().toISOString()
-              })
-              .eq('user_id', data.session.user.id)
-
-            if (updateError) {
-              console.error('Auth callback: Failed to store Google tokens:', updateError)
-            } else {
-              console.log('Auth callback: Google tokens stored successfully')
+            if (!user) {
+              console.error('Auth callback: No authenticated user found')
+              navigate('/settings?error=no_user')
+              return
             }
-          }
 
-          // Redirect to settings page with success
-          navigate('/settings?success=google_connected')
+            // Call Supabase function to exchange code for tokens
+            const { data, error } = await supabase.functions.invoke('google-business-oauth-callback', {
+              body: { code, state }
+            })
+
+            if (error) {
+              console.error('Auth callback: Supabase function error:', error)
+              navigate('/settings?error=token_exchange_failed')
+              return
+            }
+
+            if (data.error) {
+              console.error('Auth callback: Token exchange error:', data.error)
+              navigate('/settings?error=token_exchange_failed')
+              return
+            }
+            
+            console.log('Auth callback: Google My Business tokens stored successfully')
+            navigate('/settings?success=google_business_connected')
+            return
+            
+          } catch (tokenError) {
+            console.error('Auth callback: Token exchange error:', tokenError)
+            navigate('/settings?error=token_exchange_failed')
+            return
+          }
         } else {
           console.error('Auth callback: No authorization code or access token found')
           navigate('/settings?error=no_code')
