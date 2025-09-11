@@ -10,7 +10,45 @@ const AuthCallback = () => {
       try {
         console.log('Auth callback: Processing OAuth callback...')
         
-        // Get the current URL parameters
+        // Check for tokens in URL hash (implicit flow)
+        const hashParams = new URLSearchParams(window.location.hash.substring(1))
+        const accessToken = hashParams.get('access_token')
+        const providerToken = hashParams.get('provider_token')
+        const providerRefreshToken = hashParams.get('provider_refresh_token')
+        
+        if (accessToken && providerToken) {
+          console.log('Auth callback: Implicit flow tokens found in URL hash')
+          
+          // Get current user session
+          const { data: { user } } = await supabase.auth.getUser()
+          
+          if (user) {
+            console.log('Auth callback: Storing Google tokens for user:', user.id)
+            
+            // Store the Google tokens in the user's profile
+            const { error: updateError } = await supabase
+              .from('profiles')
+              .update({
+                google_access_token: providerToken,
+                google_refresh_token: providerRefreshToken,
+                google_token_expires_at: new Date(Date.now() + 3600 * 1000).toISOString(), // 1 hour from now
+                updated_at: new Date().toISOString()
+              })
+              .eq('user_id', user.id)
+
+            if (updateError) {
+              console.error('Auth callback: Failed to store Google tokens:', updateError)
+            } else {
+              console.log('Auth callback: Google tokens stored successfully')
+            }
+          }
+          
+          // Redirect to settings page with success
+          navigate('/settings?success=google_connected')
+          return
+        }
+        
+        // Check for authorization code (PKCE flow)
         const urlParams = new URLSearchParams(window.location.search)
         const code = urlParams.get('code')
         const error = urlParams.get('error')
@@ -60,7 +98,7 @@ const AuthCallback = () => {
           // Redirect to settings page with success
           navigate('/settings?success=google_connected')
         } else {
-          console.error('Auth callback: No authorization code found')
+          console.error('Auth callback: No authorization code or access token found')
           navigate('/settings?error=no_code')
         }
       } catch (error) {

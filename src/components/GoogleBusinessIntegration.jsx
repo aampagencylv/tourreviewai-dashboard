@@ -74,7 +74,7 @@ const GoogleBusinessIntegration = () => {
             access_type: 'offline',
             prompt: 'consent',
           },
-          redirectTo: `${window.location.origin}/auth/callback`
+          redirectTo: 'https://tourrevai-qfxo7m.manus.space/auth/callback'
         }
       })
 
