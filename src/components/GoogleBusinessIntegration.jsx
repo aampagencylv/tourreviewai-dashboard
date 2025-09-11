@@ -63,21 +63,40 @@ const GoogleBusinessIntegration = () => {
     try {
       setIsConnecting(true)
 
-      const { data, error } = await supabase.functions.invoke('google-business-oauth')
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        throw new Error('User not authenticated')
+      }
+
+      // Generate OAuth URL client-side (since backend functions expect different parameters)
+      const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '1234567890-abcdefghijklmnopqrstuvwxyz.apps.googleusercontent.com'
+      const redirectUri = `${window.location.origin}/oauth-callback.html`
+      const scopes = [
+        'https://www.googleapis.com/auth/business.manage',
+        'https://www.googleapis.com/auth/plus.business.manage',
+        'openid',
+        'email',
+        'profile'
+      ].join(' ')
+
+      const params = new URLSearchParams({
+        client_id: clientId,
+        redirect_uri: redirectUri,
+        response_type: 'code',
+        scope: scopes,
+        access_type: 'offline',
+        prompt: 'consent',
+        state: user.id // Pass user ID as state for callback
+      })
+
+      const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`
       
-      if (error) {
-        throw new Error(error.message)
-      }
-
-      if (!data?.authUrl) {
-        throw new Error('No authorization URL received')
-      }
-
-      console.log('Opening OAuth URL:', data.authUrl)
+      console.log('Opening OAuth URL:', authUrl)
       
       // Open OAuth popup window
       const popup = window.open(
-        data.authUrl,
+        authUrl,
         'google_oauth',
         'width=600,height=600,scrollbars=yes,resizable=yes'
       )
@@ -89,37 +108,19 @@ const GoogleBusinessIntegration = () => {
       // Set up message listener for the OAuth callback
       const handleMessage = (event) => {
         console.log('OAuth parent: Received message:', event.data)
-        if (event.data?.type === 'oauth_callback') {
-          console.log('OAuth parent: Callback received, cleaning up')
+        if (event.data?.type === 'GOOGLE_OAUTH_SUCCESS') {
+          console.log('OAuth parent: Success callback received, cleaning up')
           window.removeEventListener('message', handleMessage)
           
           // Close the popup
           try { if (popup && !popup.closed) popup.close() } catch {}
           
-          // Handle the OAuth code
-          if (event.data.code) {
-            // Send the code to the backend
-            supabase.functions.invoke('google-business-oauth-callback', {
-              body: { code: event.data.code }
-            })
-            .then(() => {
-              showToast("Success", "Google Business Profile connected successfully!")
-              // Refresh profile data after OAuth completion
-              setTimeout(fetchProfile, 1000)
-              // Fetch business listings
-              setTimeout(fetchBusinessListings, 2000)
-            })
-            .catch((error) => {
-              console.error('OAuth callback error:', error)
-              showToast("Connection Failed", "Failed to complete Google OAuth", "destructive")
-            })
-            .finally(() => {
-              setIsConnecting(false)
-            })
-          } else {
-            showToast("Connection Failed", event.data.error || "Failed to connect to Google Business Profile", "destructive")
-            setIsConnecting(false)
-          }
+          showToast("Success", "Google Business Profile connected successfully!")
+          // Refresh profile data after OAuth completion
+          setTimeout(fetchProfile, 1000)
+          // Fetch business listings
+          setTimeout(fetchBusinessListings, 2000)
+          setIsConnecting(false)
         }
       }
       
