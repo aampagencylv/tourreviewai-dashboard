@@ -29,6 +29,8 @@ const GoogleBusinessIntegration = () => {
   const [selectedBusiness, setSelectedBusiness] = useState(null)
   const [statusMessage, setStatusMessage] = useState('')
   const [isLoadingBusinesses, setIsLoadingBusinesses] = useState(false)
+  const [showTokenInput, setShowTokenInput] = useState(false)
+  const [manualToken, setManualToken] = useState('')
 
   useEffect(() => {
     fetchProfile()
@@ -234,6 +236,44 @@ const GoogleBusinessIntegration = () => {
     }
   }
 
+  const handleManualTokenInput = async () => {
+    try {
+      if (!manualToken.trim()) {
+        setStatusMessage('Please enter a valid token')
+        return
+      }
+
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        setStatusMessage('User not authenticated')
+        return
+      }
+
+      // Store the manual token in user profile
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          google_access_token: manualToken.trim(),
+          google_token_expires_at: new Date(Date.now() + 3600 * 1000).toISOString(), // 1 hour from now
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_id', user.id)
+
+      if (error) {
+        console.error('Error storing manual token:', error)
+        setStatusMessage('Error storing token: ' + error.message)
+      } else {
+        setStatusMessage('Token stored successfully! You can now fetch your businesses.')
+        setShowTokenInput(false)
+        setManualToken('')
+        fetchProfile() // Refresh profile to show connected state
+      }
+    } catch (error) {
+      console.error('Error with manual token input:', error)
+      setStatusMessage('Error: ' + error.message)
+    }
+  }
+
   const clearGoogleAuth = async () => {
     try {
       // Clear local storage and session storage
@@ -339,6 +379,14 @@ const GoogleBusinessIntegration = () => {
                     Connect Google My Business
                   </Button>
                   <Button 
+                    onClick={() => setShowTokenInput(!showTokenInput)}
+                    variant="outline"
+                    size="sm"
+                  >
+                    <SettingsIcon className="h-4 w-4 mr-2" />
+                    Manual Token
+                  </Button>
+                  <Button 
                     onClick={clearGoogleAuth}
                     variant="outline"
                     size="sm"
@@ -356,6 +404,47 @@ const GoogleBusinessIntegration = () => {
               <Info className="h-4 w-4" />
               <AlertDescription>{statusMessage}</AlertDescription>
             </Alert>
+          )}
+
+          {/* Manual Token Input */}
+          {showTokenInput && (
+            <Card className="border-blue-200 bg-blue-50">
+              <CardHeader>
+                <CardTitle className="text-sm">Manual Token Input</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    Google Provider Token
+                  </label>
+                  <textarea
+                    value={manualToken}
+                    onChange={(e) => setManualToken(e.target.value)}
+                    placeholder="Paste your provider_token from the OAuth URL here..."
+                    className="w-full p-3 border rounded-lg text-sm font-mono"
+                    rows={4}
+                  />
+                  <p className="text-xs text-gray-600 mt-1">
+                    From your OAuth URL, copy the value after "provider_token=" (starts with "ya29.")
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <Button onClick={handleManualTokenInput} size="sm">
+                    Save Token
+                  </Button>
+                  <Button 
+                    onClick={() => {
+                      setShowTokenInput(false)
+                      setManualToken('')
+                    }} 
+                    variant="outline" 
+                    size="sm"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           )}
 
           {/* Token Capture Instructions */}

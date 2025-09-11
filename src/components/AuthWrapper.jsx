@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { Button } from './ui/button'
-import { Loader2, LogIn, Mail } from 'lucide-react'
+import { Loader2, LogIn, Mail, Chrome } from 'lucide-react'
 
 const AuthWrapper = ({ children }) => {
   const [user, setUser] = useState(null)
@@ -97,6 +97,31 @@ const AuthWrapper = ({ children }) => {
     }
   }
 
+  const handleGoogleSignIn = async () => {
+    try {
+      setSigningIn(true)
+      setMessage('')
+
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.origin + '/dashboard'
+        }
+      })
+
+      if (error) {
+        throw error
+      }
+
+      // The redirect will happen automatically
+      setMessage('Redirecting to Google...')
+    } catch (error) {
+      console.error('Google sign in error:', error)
+      setMessage(error.message || 'Failed to sign in with Google')
+      setSigningIn(false)
+    }
+  }
+
   // Show loading spinner while checking auth
   if (loading) {
     return (
@@ -187,6 +212,37 @@ const AuthWrapper = ({ children }) => {
                   </>
                 ) : (
                   isSignUp ? 'Create account' : 'Sign in'
+                )}
+              </Button>
+            </div>
+
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-300" />
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-2 bg-gray-50 text-gray-500">Or continue with</span>
+              </div>
+            </div>
+
+            <div>
+              <Button
+                type="button"
+                onClick={handleGoogleSignIn}
+                disabled={signingIn}
+                variant="outline"
+                className="group relative w-full flex justify-center py-2 px-4 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+              >
+                {signingIn ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Connecting to Google...
+                  </>
+                ) : (
+                  <>
+                    <Chrome className="w-4 h-4 mr-2" />
+                    Sign in with Google
+                  </>
                 )}
               </Button>
             </div>
