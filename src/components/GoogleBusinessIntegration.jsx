@@ -72,9 +72,10 @@ const GoogleBusinessIntegration = () => {
       // Generate OAuth URL client-side (since backend functions expect different parameters)
       const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '1234567890-abcdefghijklmnopqrstuvwxyz.apps.googleusercontent.com'
       const redirectUri = `${window.location.origin}/oauth-callback.html`
+      
+      // Updated scopes - removed deprecated plus.business.manage
       const scopes = [
         'https://www.googleapis.com/auth/business.manage',
-        'https://www.googleapis.com/auth/plus.business.manage',
         'openid',
         'email',
         'profile'
@@ -87,10 +88,18 @@ const GoogleBusinessIntegration = () => {
         scope: scopes,
         access_type: 'offline',
         prompt: 'consent',
-        state: user.id // Pass user ID as state for callback
+        state: user.id, // Pass user ID as state for callback
+        include_granted_scopes: 'true' // Include previously granted scopes
       })
 
       const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`
+      
+      console.log('OAuth Debug Info:')
+      console.log('- Client ID:', clientId)
+      console.log('- Redirect URI:', redirectUri)
+      console.log('- Scopes:', scopes)
+      console.log('- User ID (state):', user.id)
+      console.log('- Full OAuth URL:', authUrl)
       
       console.log('Opening OAuth URL:', authUrl)
       
@@ -108,6 +117,7 @@ const GoogleBusinessIntegration = () => {
       // Set up message listener for the OAuth callback
       const handleMessage = (event) => {
         console.log('OAuth parent: Received message:', event.data)
+        
         if (event.data?.type === 'GOOGLE_OAUTH_SUCCESS') {
           console.log('OAuth parent: Success callback received, cleaning up')
           window.removeEventListener('message', handleMessage)
@@ -121,6 +131,18 @@ const GoogleBusinessIntegration = () => {
           // Fetch business listings
           setTimeout(fetchBusinessListings, 2000)
           setIsConnecting(false)
+        } else if (event.data?.type === 'GOOGLE_OAUTH_ERROR') {
+          console.log('OAuth parent: Error callback received:', event.data)
+          window.removeEventListener('message', handleMessage)
+          
+          // Close the popup
+          try { if (popup && !popup.closed) popup.close() } catch {}
+          
+          const errorMsg = event.data.error_description || event.data.error || 'OAuth authorization failed'
+          showToast("OAuth Failed", errorMsg, "destructive")
+          setIsConnecting(false)
+        } else if (event.data?.type === 'OAUTH_DEBUG') {
+          console.log('OAuth Debug from callback:', event.data)
         }
       }
       
