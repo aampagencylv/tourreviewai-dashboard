@@ -1,26 +1,18 @@
 import React from 'react'
-import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
+import { Link, NavLink, useLocation } from 'react-router-dom'
 import { Button } from './ui/button'
-import { supabase } from '../lib/supabase'
+import { useAuth } from '../contexts/AuthContext'
 
 const Header = () => {
   const location = useLocation()
-  const navigate = useNavigate()
+  const { signOut, user } = useAuth()
 
   const handleSignOut = async () => {
     try {
-      const { error } = await supabase.auth.signOut()
-      if (error) {
-        console.error('Error signing out:', error)
-      } else {
-        // Clear any local storage
-        localStorage.clear()
-        sessionStorage.clear()
-        // Redirect to login or home page
-        window.location.href = '/'
-      }
+      await signOut()
     } catch (error) {
       console.error('Sign out error:', error)
+      alert('Error signing out: ' + error.message)
     }
   }
 
