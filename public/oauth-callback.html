@@ -88,8 +88,9 @@
         if (window.opener && !window.opener.closed) {
           window.opener.postMessage({
             type: 'oauth_callback',
-            code: params.code
-          }, window.location.origin);
+            code: params.code,
+            state: params.state
+          }, 'https://tourreview-4ps5gs.manus.space');
           
           // Close this window after a short delay
           setTimeout(() => window.close(), 2000);
@@ -107,7 +108,7 @@
           window.opener.postMessage({
             type: 'oauth_callback',
             error: params.error
-          }, window.location.origin);
+          }, 'https://tourreview-4ps5gs.manus.space');
           
           // Close this window after a short delay
           setTimeout(() => window.close(), 2000);
