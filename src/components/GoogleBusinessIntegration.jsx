@@ -32,13 +32,46 @@ const GoogleBusinessIntegration = () => {
 
       const { data, error } = await supabase
         .from('profiles')
-        .select('google_access_token, google_token_expires_at, last_google_sync_at, company_name, google_business_id')
+        .select('google_access_token, google_token_expires_at, last_google_sync_at, company_name, google_business_id, google_refresh_token')
         .eq('user_id', user.id)
         .single()
 
       if (error) {
         console.error('Error fetching profile:', error)
         return
+      }
+
+      // Check if we have a refresh token and token is expired or expires soon
+      if (data?.google_refresh_token && data?.google_token_expires_at) {
+        const expiresAt = new Date(data.google_token_expires_at)
+        const now = new Date()
+        const fiveMinutesFromNow = new Date(now.getTime() + 5 * 60 * 1000)
+
+        if (expiresAt <= fiveMinutesFromNow) {
+          console.log('Token expired or expires soon, attempting refresh...')
+          try {
+            const { data: refreshData, error: refreshError } = await supabase.functions.invoke('google-token-refresh')
+            
+            if (refreshError) {
+              console.error('Token refresh failed:', refreshError)
+            } else if (refreshData?.success) {
+              console.log('Token refreshed successfully')
+              // Refetch profile with updated token
+              const { data: updatedData } = await supabase
+                .from('profiles')
+                .select('google_access_token, google_token_expires_at, last_google_sync_at, company_name, google_business_id, google_refresh_token')
+                .eq('user_id', user.id)
+                .single()
+              
+              if (updatedData) {
+                setProfile(updatedData)
+                return
+              }
+            }
+          } catch (refreshError) {
+            console.error('Token refresh error:', refreshError)
+          }
+        }
       }
 
       setProfile(data)
