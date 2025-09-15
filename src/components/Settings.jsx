@@ -208,7 +208,31 @@ const Settings = () => {
             </div>
 
             <div className="flex flex-col space-y-2">
-              <Button variant="outline" size="sm">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={async () => {
+                  try {
+                    const { data: { session } } = await supabase.auth.getSession()
+                    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/tripadvisor-sync`, {
+                      method: 'POST',
+                      headers: {
+                        'Authorization': `Bearer ${session?.access_token}`,
+                        'Content-Type': 'application/json'
+                      }
+                    })
+                    
+                    if (response.ok) {
+                      alert('TripAdvisor sync started successfully!')
+                    } else {
+                      alert('TripAdvisor sync failed. Please try again.')
+                    }
+                  } catch (error) {
+                    console.error('TripAdvisor sync error:', error)
+                    alert('TripAdvisor sync failed. Please try again.')
+                  }
+                }}
+              >
                 <RefreshCw className="w-4 h-4 mr-2" />
                 Sync Now
               </Button>
