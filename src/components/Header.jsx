@@ -1,9 +1,28 @@
 import React from 'react'
-import { Link, NavLink, useLocation } from 'react-router-dom'
+import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { Button } from './ui/button'
+import { supabase } from '../lib/supabase'
 
 const Header = () => {
   const location = useLocation()
+  const navigate = useNavigate()
+
+  const handleSignOut = async () => {
+    try {
+      const { error } = await supabase.auth.signOut()
+      if (error) {
+        console.error('Error signing out:', error)
+      } else {
+        // Clear any local storage
+        localStorage.clear()
+        sessionStorage.clear()
+        // Redirect to login or home page
+        window.location.href = '/'
+      }
+    } catch (error) {
+      console.error('Sign out error:', error)
+    }
+  }
 
   const navItems = [
     { path: '/', label: 'Dashboard' },
@@ -45,7 +64,7 @@ const Header = () => {
 
           {/* Right side - Sign Out */}
           <div className="flex items-center">
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" onClick={handleSignOut}>
               Sign Out
             </Button>
           </div>
