@@ -96,25 +96,16 @@ const GoogleBusinessIntegration = () => {
     try {
       setIsConnecting(true)
 
-      // Use Supabase's built-in OAuth
+      // Simple Supabase OAuth as per documentation
       const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          scopes: 'https://www.googleapis.com/auth/business.manage https://www.googleapis.com/auth/plus.business.manage openid email profile',
-          redirectTo: `${window.location.origin}/settings?tab=integrations`,
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'consent'
-          }
-        }
+        provider: 'google'
       })
 
       if (error) {
         throw new Error(error.message)
       }
 
-      // The OAuth flow will redirect to the callback URL
-      // and then back to our app, so we don't need to handle the popup here
+      console.log('OAuth initiated:', data)
       
     } catch (error) {
       console.error('OAuth initiation error:', error)
