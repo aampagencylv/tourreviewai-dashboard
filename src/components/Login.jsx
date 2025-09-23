@@ -1,12 +1,7 @@
 import React, { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { Button } from './ui/button'
-import { Input } from './ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
-import { Separator } from './ui/separator'
-import { Label } from './ui/label'
-import { Alert, AlertDescription } from './ui/alert'
-import { Mail, Lock, Eye, EyeOff } from 'lucide-react'
 
 const Login = () => {
   const [loading, setLoading] = useState(false)
@@ -116,76 +111,84 @@ const Login = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             {error && (
-              <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
+              <div className="bg-red-50 border border-red-200 rounded-md p-3">
+                <p className="text-red-800 text-sm">{error}</p>
+              </div>
             )}
             
             {message && (
-              <Alert>
-                <AlertDescription>{message}</AlertDescription>
-              </Alert>
+              <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+                <p className="text-blue-800 text-sm">{message}</p>
+              </div>
             )}
 
             {/* Email/Password Form */}
             <form onSubmit={handleEmailAuth} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                  <Input
-                    id="email"
-                    name="email"
-                    type="email"
-                    placeholder="Enter your email"
-                    value={formData.email}
-                    onChange={handleInputChange}
-                    className="pl-10"
-                    required
-                  />
-                </div>
+                <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                  Email
+                </label>
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  placeholder="Enter your email"
+                  value={formData.email}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  required
+                />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
+                <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+                  Password
+                </label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                  <Input
+                  <input
                     id="password"
                     name="password"
                     type={showPassword ? 'text' : 'password'}
                     placeholder="Enter your password"
                     value={formData.password}
                     onChange={handleInputChange}
-                    className="pl-10 pr-10"
+                    className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                     required
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-3 h-4 w-4 text-gray-400 hover:text-gray-600"
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-sm leading-5"
                   >
-                    {showPassword ? <EyeOff /> : <Eye />}
+                    {showPassword ? (
+                      <svg className="h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
+                      </svg>
+                    ) : (
+                      <svg className="h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                      </svg>
+                    )}
                   </button>
                 </div>
               </div>
 
               {isSignUp && (
                 <div className="space-y-2">
-                  <Label htmlFor="confirmPassword">Confirm Password</Label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                    <Input
-                      id="confirmPassword"
-                      name="confirmPassword"
-                      type={showPassword ? 'text' : 'password'}
-                      placeholder="Confirm your password"
-                      value={formData.confirmPassword}
-                      onChange={handleInputChange}
-                      className="pl-10"
-                      required
-                    />
-                  </div>
+                  <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
+                    Confirm Password
+                  </label>
+                  <input
+                    id="confirmPassword"
+                    name="confirmPassword"
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="Confirm your password"
+                    value={formData.confirmPassword}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    required
+                  />
                 </div>
               )}
 
@@ -208,10 +211,10 @@ const Login = () => {
 
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
-                <Separator />
+                <div className="w-full border-t border-gray-300" />
               </div>
               <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-white px-2 text-muted-foreground">Or continue with</span>
+                <span className="bg-white px-2 text-gray-500">Or continue with</span>
               </div>
             </div>
 
@@ -219,8 +222,7 @@ const Login = () => {
             <Button 
               onClick={handleGoogleLogin}
               disabled={loading}
-              variant="outline"
-              className="w-full"
+              className="w-full bg-white text-gray-700 border border-gray-300 hover:bg-gray-50"
               size="lg"
             >
               {loading ? (
@@ -244,7 +246,7 @@ const Login = () => {
             {/* Toggle Sign Up/Sign In */}
             <div className="text-center text-sm">
               {isSignUp ? (
-                <span>
+                <span className="text-gray-600">
                   Already have an account?{' '}
                   <button
                     type="button"
@@ -260,7 +262,7 @@ const Login = () => {
                   </button>
                 </span>
               ) : (
-                <span>
+                <span className="text-gray-600">
                   Don't have an account?{' '}
                   <button
                     type="button"
