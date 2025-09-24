@@ -1,7 +1,7 @@
-import React, { createContext, useContext, useEffect, useState } from 'react'
+import React, { createContext, useContext, useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 
-const AuthContext = createContext({})
+const AuthContext = createContext()
 
 export const useAuth = () => {
   const context = useContext(AuthContext)
@@ -33,20 +33,46 @@ export const AuthProvider = ({ children }) => {
       }
     )
 
-    return () => subscription.unsubscribe()
+    return () => subscription?.unsubscribe()
   }, [])
+
+  const signInWithGoogle = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/dashboard`
+      }
+    })
+    if (error) throw error
+  }
+
+  const signInWithEmail = async (email, password) => {
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    })
+    if (error) throw error
+  }
+
+  const signUpWithEmail = async (email, password) => {
+    const { error } = await supabase.auth.signUp({
+      email,
+      password
+    })
+    if (error) throw error
+  }
 
   const signOut = async () => {
     const { error } = await supabase.auth.signOut()
-    if (error) {
-      console.error('Error signing out:', error)
-      throw error
-    }
+    if (error) throw error
   }
 
   const value = {
     user,
     loading,
+    signInWithGoogle,
+    signInWithEmail,
+    signUpWithEmail,
     signOut
   }
 
@@ -56,6 +82,3 @@ export const AuthProvider = ({ children }) => {
     </AuthContext.Provider>
   )
 }
-
-export default AuthContext
-

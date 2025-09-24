@@ -1,35 +1,61 @@
 import React from 'react'
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
-import { AuthProvider } from './contexts/AuthContext'
-import ProtectedRoute from './components/ProtectedRoute'
-import Header from './components/Header'
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import { AuthProvider, useAuth } from './contexts/AuthContext'
 import Dashboard from './components/Dashboard'
-import Contacts from './components/Contacts'
-import Collect from './components/Collect'
 import Settings from './components/Settings'
-import './App.css'
+import Login from './components/Login'
+import Header from './components/Header'
+import { Toaster } from 'sonner'
+
+const ProtectedRoute = ({ children }) => {
+  const { user, loading } = useAuth()
+  
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+      </div>
+    )
+  }
+  
+  return user ? children : <Navigate to="/login" />
+}
+
+const AppContent = () => {
+  const { user } = useAuth()
+  
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {user && <Header />}
+      <main className={user ? "container mx-auto px-4 py-8" : ""}>
+        <Routes>
+          <Route path="/login" element={!user ? <Login /> : <Navigate to="/dashboard" />} />
+          <Route path="/dashboard" element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/settings" element={
+            <ProtectedRoute>
+              <Settings />
+            </ProtectedRoute>
+          } />
+          <Route path="/" element={<Navigate to={user ? "/dashboard" : "/login"} />} />
+        </Routes>
+      </main>
+      <Toaster />
+    </div>
+  )
+}
 
 function App() {
   return (
-    <AuthProvider>
-      <Router>
-        <div className="min-h-screen bg-gray-50">
-          <ProtectedRoute>
-            <Header />
-            <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-              <Routes>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/contacts" element={<Contacts />} />
-                <Route path="/collect" element={<Collect />} />
-                <Route path="/settings" element={<Settings />} />
-              </Routes>
-            </main>
-          </ProtectedRoute>
-        </div>
-      </Router>
-    </AuthProvider>
+    <Router>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </Router>
   )
 }
 
 export default App
-
