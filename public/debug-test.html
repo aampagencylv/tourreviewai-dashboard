@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Import Test</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50">
+    <div class="container mx-auto max-w-4xl py-8">
+        <div class="bg-white rounded-lg shadow-lg p-8">
+            <h1 class="text-3xl font-bold text-gray-800 mb-8">🔧 Debug Import Test</h1>
+            
+            <div class="mb-6">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                <input type="email" id="email" class="w-full px-3 py-2 border rounded-lg" value="steve@vegasjeeptours.com">
+            </div>
+            
+            <div class="mb-6">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                <input type="password" id="password" class="w-full px-3 py-2 border rounded-lg" placeholder="Enter your password">
+            </div>
+
+            <div class="grid grid-cols-3 gap-4 mb-8">
+                <button id="loginBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded">
+                    1. Login
+                </button>
+                <button id="debugBtn" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded" disabled>
+                    2. Test Debug
+                </button>
+                <button id="importBtn" class="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-4 rounded" disabled>
+                    3. Test Import
+                </button>
+            </div>
+
+            <div id="status" class="mb-4"></div>
+            <div id="results" class="mb-4"></div>
+            <pre id="output" class="bg-gray-900 text-green-400 p-4 rounded-lg text-sm overflow-auto max-h-96"></pre>
+        </div>
+    </div>
+
+    <script type="module">
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+        
+        const SUPABASE_URL = 'https://gzoklzhxnfogmtlkdnhp.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd6b2tsemh4bmZvZ210bGtkbmhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcxOTMyMjAsImV4cCI6MjA3Mjc2OTIyMH0.f7aM3ckvd2bw7nLawhDs0pVbQD48YcDvYnppzqfJhY8';
+        
+        const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        let session = null;
+        
+        function log(message, data = null) {
+            const output = document.getElementById('output');
+            const timestamp = new Date().toLocaleTimeString();
+            output.textContent += `[${timestamp}] ${message}\n`;
+            if (data) {
+                output.textContent += JSON.stringify(data, null, 2) + '\n';
+            }
+            output.scrollTop = output.scrollHeight;
+        }
+        
+        function setStatus(message, type = 'info') {
+            const status = document.getElementById('status');
+            const colors = {
+                info: 'bg-blue-100 text-blue-700',
+                success: 'bg-green-100 text-green-700',
+                error: 'bg-red-100 text-red-700'
+            };
+            status.className = `p-4 rounded-lg ${colors[type]}`;
+            status.textContent = message;
+        }
+        
+        document.getElementById('loginBtn').addEventListener('click', async () => {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            if (!password) {
+                setStatus('Please enter your password', 'error');
+                return;
+            }
+            
+            setStatus('Logging in...', 'info');
+            log('Attempting login...');
+            
+            const { data, error } = await supabase.auth.signInWithPassword({
+                email,
+                password
+            });
+            
+            if (error) {
+                setStatus(`Login failed: ${error.message}`, 'error');
+                log('Login error:', error);
+                return;
+            }
+            
+            session = data.session;
+            setStatus('Login successful!', 'success');
+            log('Logged in as:', { email: data.user.email, id: data.user.id });
+            
+            document.getElementById('debugBtn').disabled = false;
+            document.getElementById('importBtn').disabled = false;
+        });
+        
+        document.getElementById('debugBtn').addEventListener('click', async () => {
+            if (!session) {
+                setStatus('Please login first', 'error');
+                return;
+            }
+            
+            setStatus('Running debug test...', 'info');
+            log('Calling debug-import function...');
+            
+            const { data, error } = await supabase.functions.invoke('debug-import', {
+                headers: {
+                    Authorization: `Bearer ${session.access_token}`
+                }
+            });
+            
+            if (error) {
+                setStatus(`Debug failed: ${error.message}`, 'error');
+                log('Debug error:', error);
+                return;
+            }
+            
+            setStatus('Debug successful!', 'success');
+            log('Debug results:', data);
+            
+            document.getElementById('results').innerHTML = `
+                <div class="bg-green-50 p-4 rounded-lg">
+                    <h3 class="font-semibold mb-2">Debug Results:</h3>
+                    <ul class="text-sm space-y-1">
+                        <li>✅ User ID: ${data.debug.user_id}</li>
+                        <li>✅ Email: ${data.debug.user_email}</li>
+                        <li>${data.debug.dataforseo_configured ? '✅' : '❌'} DataForSEO configured</li>
+                        <li>${data.debug.smart_import_exists ? '✅' : '❌'} Smart import exists</li>
+                        <li>${data.debug.profile_data ? '✅' : '❌'} Profile found</li>
+                    </ul>
+                </div>
+            `;
+        });
+        
+        document.getElementById('importBtn').addEventListener('click', async () => {
+            if (!session) {
+                setStatus('Please login first', 'error');
+                return;
+            }
+            
+            setStatus('Testing import...', 'info');
+            log('Calling smart-review-import function...');
+            
+            const { data, error } = await supabase.functions.invoke('smart-review-import', {
+                body: {
+                    platforms: ['tripadvisor'],
+                    tripadvisor_url: 'https://www.tripadvisor.com/Attraction_Review-g45963-d14068149-Reviews-Vegas_Jeep_Tours-Las_Vegas_Nevada.html'
+                },
+                headers: {
+                    Authorization: `Bearer ${session.access_token}`
+                }
+            });
+            
+            if (error) {
+                setStatus(`Import failed: ${error.message}`, 'error');
+                log('Import error:', error);
+                return;
+            }
+            
+            setStatus('Import successful!', 'success');
+            log('Import results:', data);
+        });
+        
+        log('Debug page ready');
+        log('Supabase URL: ' + SUPABASE_URL);
+    </script>
+</body>
+</html>
