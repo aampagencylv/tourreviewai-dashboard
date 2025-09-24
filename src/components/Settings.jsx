@@ -7,6 +7,8 @@ import { Badge } from './ui/badge'
 import { Switch } from './ui/switch'
 import { Label } from './ui/label'
 import GoogleBusinessIntegration from './GoogleBusinessIntegration'
+import TripAdvisorIntegration from './TripAdvisorIntegration'
+import { supabase } from '../lib/supabase'
 import { 
   Building2, 
   Plug, 
@@ -37,19 +39,6 @@ const Settings = () => {
   })
 
   const [integrations] = useState({
-    googleMyBusiness: {
-      connected: false,
-      status: 'disconnected',
-      features: ['Review Sync', 'Reply to Reviews', 'Profile Management', 'Analytics', 'OAuth Authentication'],
-      lastSync: null
-    },
-    tripadvisor: {
-      connected: true,
-      status: 'active',
-      features: ['Review Import', 'Bulk Sync', 'Real-time Updates', 'Response Management'],
-      lastSync: 'Jan 15, 2024, 10:25 AM',
-      reviewCount: 150
-    },
     twilio: {
       connected: false,
       status: 'disconnected',
@@ -158,96 +147,8 @@ const Settings = () => {
       {/* Google My Business - Real OAuth Integration */}
       <GoogleBusinessIntegration />
 
-      {/* TripAdvisor */}
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex items-start justify-between">
-            <div className="flex items-start space-x-4">
-              <div className="p-3 bg-green-100 rounded-lg">
-                <Globe className="w-6 h-6 text-green-600" />
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center space-x-2 mb-2">
-                  <h3 className="text-lg font-semibold">TripAdvisor</h3>
-                  <Badge className="bg-green-100 text-green-800">
-                    {integrations.tripadvisor.status}
-                  </Badge>
-                </div>
-                <p className="text-gray-600 mb-4">
-                  Import and manage reviews from TripAdvisor for your business
-                </p>
-                
-                <div className="flex items-center space-x-4 mb-4">
-                  <div className="flex items-center space-x-2">
-                    <CheckCircle className="w-4 h-4 text-green-500" />
-                    <span className="text-sm text-gray-600">Connected</span>
-                  </div>
-                  <div className="text-sm text-gray-600">
-                    Last sync: {integrations.tripadvisor.lastSync}
-                  </div>
-                </div>
-
-                <div className="flex items-center space-x-6 mb-4">
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-green-600">{integrations.tripadvisor.reviewCount}</div>
-                    <div className="text-sm text-gray-500">reviews</div>
-                  </div>
-                </div>
-
-                <div className="mb-4">
-                  <h4 className="text-sm font-medium text-gray-900 mb-2">Features</h4>
-                  <div className="flex flex-wrap gap-2">
-                    {integrations.tripadvisor.features.map((feature, index) => (
-                      <Badge key={index} variant="outline" className="text-xs">
-                        {feature}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex flex-col space-y-2">
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={async () => {
-                  try {
-                    const { data: { session } } = await supabase.auth.getSession()
-                    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/tripadvisor-sync`, {
-                      method: 'POST',
-                      headers: {
-                        'Authorization': `Bearer ${session?.access_token}`,
-                        'Content-Type': 'application/json'
-                      }
-                    })
-                    
-                    if (response.ok) {
-                      alert('TripAdvisor sync started successfully!')
-                    } else {
-                      alert('TripAdvisor sync failed. Please try again.')
-                    }
-                  } catch (error) {
-                    console.error('TripAdvisor sync error:', error)
-                    alert('TripAdvisor sync failed. Please try again.')
-                  }
-                }}
-              >
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Sync Now
-              </Button>
-              <Button variant="outline" size="sm">
-                <SettingsIcon className="w-4 h-4 mr-2" />
-                Configure
-              </Button>
-              <Button variant="outline" size="sm">
-                <Unplug className="w-4 h-4 mr-2" />
-                Disconnect
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* TripAdvisor - Using the actual integration component */}
+      <TripAdvisorIntegration />
 
       {/* Twilio */}
       <Card>
@@ -424,4 +325,3 @@ const Settings = () => {
 }
 
 export default Settings
-
